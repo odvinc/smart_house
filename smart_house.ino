@@ -1,5 +1,5 @@
 // ---
-// smart house v3 Serial1 (invert button)
+// smart house v3 Serial1 (invert button and sensors)
 // ---
 
 #define numSensors sizeof(mySensors)/sizeof(tSensor) // подсчет количества элементов в массиве numSensors
@@ -39,8 +39,8 @@ tDevice;
 
 // объявление сенсоров и их кодов ошибок
 tSensor mySensors[] = {
-  { 6, false, false, "Water", "WARNING! Found water leakage.", "Water leakage disappeared." },
-  { 3, false, false,   "Gas",   "WARNING! Found gas leakage.",   "Gas leakage disappeared." }
+  { 6, true, false, "Water", "WARNING! Found water leakage.", "Water leakage disappeared." },
+  { 3, true, false,   "Gas",   "WARNING! Found gas leakage.",   "Gas leakage disappeared." }
 };
 
 // объявление устройств и их состояний
@@ -415,13 +415,13 @@ void loop(){
   for (int i = 0; i < numSensors; i++){
     mySensors[i].state = digitalRead(mySensors[i].pin);
     //Serial.println(mySensors[i].name + String(" = ") + mySensors[i].state);
-    if (mySensors[i].state==true && mySensors[i].alarm==false){ // если сработал сенсор и состояние сенсоров было "покой", то
+    if (mySensors[i].state==false && mySensors[i].alarm==false){ // если сработал сенсор и состояние сенсоров было "покой", то
       mySensors[i].alarm=true; // перевести систему в состояние аварии по сенсору
       sendTextMessage(mySensors[i].errorMsg); // немедленно отправляем смс сообщение о сработке сенсора
       Serial.println(mySensors[i].errorMsg);
       runSiren(5); // Включить сирену 5 раза
     }
-    if(mySensors[i].state==false && mySensors[i].alarm==true){ // если авария пропала и состояние сенсора было "авария", то
+    if(mySensors[i].state==true && mySensors[i].alarm==true){ // если авария пропала и состояние сенсора было "авария", то
       mySensors[i].alarm=false; // перевести систему в состояние покоя по сенсору
       Serial.println(mySensors[i].errorOk);
     }
