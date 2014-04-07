@@ -1,7 +1,8 @@
 // ---
-// smart house v3 Serial1
+// smart house v3 SoftwareSerial
 // ---
 
+#include <SoftwareSerial.h>
 #define numSensors sizeof(mySensors)/sizeof(tSensor) // подсчет количества элементов в массиве numSensors
 #define numDevices sizeof(myDevices)/sizeof(tDevice) // подсчет количества элементов в массиве numDevices
 #define numPhones  sizeof(smsNumbers)/sizeof(char*) // подсчет количества элементов в массиве numPhones
@@ -56,6 +57,7 @@ boolean sensorState = false; // состояние всех сенсоров
 int alarmState = 0; // состояние сигнализации ( 0 - выкл, 1 - нажата секретка, 2 - нажата секретка и открыта дверь, 3 - на охране, 4 - несанкционированное проникновение)
 unsigned long currentTime;
 unsigned long loopTime;
+SoftwareSerial gsmSerial(9, 11); // RX, TX
 //char* smsNumbers[] = {}; // запуск без телефонов, смс не будут отсылаться
 char* smsNumbers[] = {"+79110000000", "+79630000000"}; // номера на которые необходимо отсылать аварийные сообщения
 String secretStr = "7770:"; // кодовое слово для подачи команд по смс
@@ -68,20 +70,21 @@ void(* resetFunc) (void) = 0;
 
 /*
  * Функция отправки SMS-сообщения
+
  */
 void sendTextMessage(String text) {
   for (int i = 0; i < numPhones; i++){
     // Устанавливает текстовый режим для SMS-сообщений
-    Serial1.println("AT+CMGF=1");
+    gsmSerial.println("AT+CMGF=1");
     delay(100); // даём время на усваивание команды
     // Устанавливаем адресата: телефонный номер в международном формате
-    Serial1.println("AT+CMGS=\""+String(smsNumbers[i])+"\""); 
+    gsmSerial.println("AT+CMGS=\""+String(smsNumbers[i])+"\""); 
     delay(300);
     // Пишем текст сообщения
-    Serial1.print(text);
+    gsmSerial.print(text);
     delay(300);
     // Отправляем Ctrl+Z, обозначая, что сообщение готово
-    Serial1.print((char)26);
+    gsmSerial.print((char)26);
     delay(5000);
   }
 } 
@@ -175,10 +178,10 @@ boolean checkIFF(int second) {
  */
 String readSerial() {
   String inData = "";
-  if (Serial1.available() > 0) {
-    int h = Serial1.available();
+  if (gsmSerial.available() > 0) {
+    int h = gsmSerial.available();
     for (int i = 0; i < h; i++) {
-      inData += (char)Serial1.read();
+      inData += (char)gsmSerial.read();
     }
     return inData;
   }
@@ -194,8 +197,8 @@ String readSerialStr() {
   boolean retStr=false;
   char currentChar;
   delay(100);
-  while(Serial1.available() && retStr==false) {
-    currentChar = Serial1.read();  
+  while(gsmSerial.available() && retStr==false) {
+    currentChar = gsmSerial.read();  
     //if (currentChar=='\n' || currentChar=='\r') {
     if (currentChar=='\n') {
       retStr=true;
@@ -303,20 +306,20 @@ void setup(){
   digitalWrite(gsmPowerPin, LOW);
   delay(5000);
 
-  Serial1.begin(9600);
-  Serial1.flush();
+  gsmSerial.begin(9600);
+  gsmSerial.flush();
   // опрашиваем gsm-модем
-  Serial1.println("AT");
+  gsmSerial.println("AT");
   delay(100);   
-  Serial1.println("AT+CSCA?"); // запрашиваем номер смс-центра
+  gsmSerial.println("AT+CSCA?"); // запрашиваем номер смс-центра
   delay(300);
-  Serial1.println("AT+CMGF=1"); // выставляем текстовым режим сообщений
+  gsmSerial.println("AT+CMGF=1"); // выставляем текстовым режим сообщений
   delay(300);
-  Serial1.println("AT+IFC=1,1");  // Set Local Data Flow Control
+  gsmSerial.println("AT+IFC=1,1");  // Set Local Data Flow Control
   delay(300);
-  Serial1.println("AT+CPBS=\"SM\""); // SIM Phonebook Memory Storage
+  gsmSerial.println("AT+CPBS=\"SM\""); // SIM Phonebook Memory Storage
   delay(300);
-  Serial1.println("AT+CNMI=1,2,2,1,1"); // Включаю перехват SMS
+  gsmSerial.println("AT+CNMI=1,2,2,1,1"); // Включаю перехват SMS
   delay(500);
 
   currentTime = millis(); // считать текущие значение секунд с момента запуска Arduino
@@ -436,10 +439,10 @@ void loop(){
     }
     
     //if (Serial.available()){  // если в буфере серийного порта есть данные (для теста)
-    //  Serial1.print((char)Serial.read());  // отправить на модем (для теста)
+    //  gsmSerial.print((char)Serial.read());  // отправить на модем (для теста)
     //}
     
-    if (Serial1.available()){  // если в буфере серийного порта есть данные
+    if (gsmSerial.available()){  // если в буфере серийного порта есть данные
       currentStr=readSerialStr(); // считываем одну строку из буфера серийного порта посимвольно
       currentStr.trim();
       //Serial.println(currentStr);
