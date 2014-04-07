@@ -1,5 +1,5 @@
 // ---
-// smart house v3 Serial1
+// smart house v3 Serial1 (invert button)
 // ---
 
 #define numSensors sizeof(mySensors)/sizeof(tSensor) // подсчет количества элементов в массиве numSensors
@@ -50,7 +50,7 @@ tDevice myDevices[] = {
 };
 
 // переменные
-boolean buttonState = false; // состояние кнопки
+boolean buttonState = true; // состояние кнопки
 boolean perimeterState = false; // состояние периметра
 boolean sensorState = false; // состояние всех сенсоров
 int alarmState = 0; // состояние сигнализации ( 0 - выкл, 1 - нажата секретка, 2 - нажата секретка и открыта дверь, 3 - на охране, 4 - несанкционированное проникновение)
@@ -161,8 +161,8 @@ void setAlarm(int state) {
  */
 boolean checkIFF(int second) {
   int i=0;
-  buttonState = false; // на всякий случай обнуляем состояние секретной кнопки
-  while(i <= second*10 && buttonState == false){ // цикл ожидающий нажатия i секунд на нажатие секретной кнопки
+  buttonState = true; // на всякий случай обнуляем состояние секретной кнопки
+  while(i <= second*10 && buttonState == true){ // цикл ожидающий нажатия i секунд на нажатие секретной кнопки
     buttonState = digitalRead(buttonPin); // читаем текущее состояние секретной кнопки
     delay(1000/10); // задержка выполнения цикла на 1/10 секунду
     i++;
@@ -356,8 +356,8 @@ void setup(){
 void loop(){
   digitalWrite(sysledPin, HIGH);
   buttonState = digitalRead(buttonPin); // считываем состояние секретной кнопки
-  if(buttonState==true && alarmState==0){ // если нажата кнопка и система не на охране, то
-    //if(buttonState==true && perimeterState==true && alarmState==0){ // если нажата кнопка, закрыта дверь, и система не на охране, то
+  if(buttonState==false && alarmState==0){ // если нажата кнопка и система не на охране, то
+    //if(buttonState==false && perimeterState==true && alarmState==0){ // если нажата кнопка, закрыта дверь, и система не на охране, то
     alarmState=1; // перевести систему в состояние готовности постановки на охрану
     setAlarm(1); // сообщить гудком, что нажата кнопка
     delay(1000);
@@ -381,7 +381,7 @@ void loop(){
   if(alarmState==3){ // если система находится на охране
     if(perimeterState==false) { // и произошло размыкание контура или открытие двери
       // выполняем проверку свой-чужой через функцию checkIFF(second), где second количество секунд для нажатия секретной кнопки
-      if(checkIFF(10)==false) { // если в течении 10 секунд секретная кнопка не нажата, то
+      if(checkIFF(10)==true) { // если в течении 10 секунд секретная кнопка не нажата, то
         alarmState = 4; // перевод сигнализации в состояние - несанкционированное проникновение
         sendTextMessage("WARNING! The perimeter broken, unauthorized access."); // немедленно отправляем смс сообщение о несанкционированном проникновении
         Serial.println("WARNING! The perimeter broken, unauthorized access.");
@@ -398,7 +398,7 @@ void loop(){
     runSiren(1); // Включаем серену 1 раз
     buttonState = digitalRead(buttonPin); // считываем еще раз состояние секретной кнопки
     currentTime = millis(); // считать текущие значение секунд с момента запуска Arduino
-    if(buttonState==true){ // если секретную кнопку все же нажали после сирены, то
+    if(buttonState==false){ // если секретную кнопку все же нажали после сирены, то
       if(currentTime >= (loopTime + 4000)){ //если кнопка нажата уже 4 секунды, то
         alarmState=0; // снимаем систему с охраны
         setAlarm(0); // сообщить гудком, что система снята с охраны
