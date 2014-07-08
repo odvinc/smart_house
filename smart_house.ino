@@ -8,10 +8,12 @@
 // постоянные
 const int buttonPin = 12; // пин для кнопки
 const int perimeterPin = 8; // пин для периметра
+const int motionSensorPin = 9; // пин для датчика движения
 const int ledPin = 10 ; // пин индикатора
 const int sysledPin = 13; // пин системного индикатора
 const int tonePin = 5; // пин для динамика
 const int gsmPowerPin = 4; // пин включения GSM модема
+const long hotTime = 30; // время в сек. при котором система будет ждать снятия с охраны до перехода в режим тревоги
 const long restTime = 15; // время в сек. в котором система будет в состоянии покоя после снятия с охраны
 const long restSiren = 300; // время в сек. в котором система будет не будет повторно подавать аварийный сигнал на динамик, в случае аварии по сенсорам
 
@@ -52,6 +54,7 @@ tDevice myDevices[] = {
 // переменные
 boolean buttonState = true; // состояние кнопки
 boolean perimeterState = false; // состояние периметра
+boolean motionSensorState = false; // состояние датчика движения
 boolean sensorState = false; // состояние всех сенсоров
 int alarmState = 0; // состояние сигнализации ( 0 - выкл, 1 - нажата секретка, 2 - нажата секретка и открыта дверь, 3 - на охране, 4 - несанкционированное проникновение)
 unsigned long currentTime;
@@ -208,7 +211,7 @@ String readSerialStr() {
 }
 
 /*
- * Функция опрос состояния системы и отправить отчет по sms
+ * Функция опроса состояния системы и отправки отчета по sms
  */
 void getStatus() {
   String msgReport="";
@@ -217,6 +220,14 @@ void getStatus() {
   } 
   else { // иначе
     msgReport += "Perimeter=Ok; ";
+  }
+  msgReport += "\n";
+  
+  if(motionSensorState==true){ // если сработал датчик движения
+    msgReport += "motionSensor=True; ";
+  } 
+  else { // иначе
+    msgReport += "motionSensor=False; ";
   }
   msgReport += "\n";
   
@@ -246,7 +257,7 @@ void getStatus() {
 }
 
 /*
- * Функция парсинга sms сообщение и выполнение заданных команд
+ * Функция парсинга sms сообщений и выполнения заданных команд
  */
 void parseSMS(String msg) {
   String tmp = "";
@@ -356,6 +367,7 @@ void setup(){
 void loop(){
   digitalWrite(sysledPin, HIGH);
   buttonState = digitalRead(buttonPin); // считываем состояние секретной кнопки
+  motionSensorState = digitalRead(motionSensorPin); // считываем состояние датчика движения
   if(buttonState==false && alarmState==0){ // если нажата кнопка и система не на охране, то
     //if(buttonState==false && perimeterState==true && alarmState==0){ // если нажата кнопка, закрыта дверь, и система не на охране, то
     alarmState=1; // перевести систему в состояние готовности постановки на охрану
@@ -373,18 +385,24 @@ void loop(){
       //  perimeterState = digitalRead(perimeterPin);
     }
     if(perimeterState==true && alarmState==2) { // если дверь закрыли после нажатия на секретную кнопку, то
-      alarmState=3; // переход в крайнее положение постановки на охрану, ждем закрытия двери
+      alarmState=3; // переход в состояние охраны
       setAlarm(2); // сообщить гудком, что система поставлена на охрану
       Serial.println("The system is armed.");
     }
   }
   if(alarmState==3){ // если система находится на охране
-    if(perimeterState==false) { // и произошло размыкание контура или открытие двери
+    if(perimeterState==false  || motionSensorState==true) { // и произошло размыкание контура, открытие двери или сработал датчик движения
       // выполняем проверку свой-чужой через функцию checkIFF(second), где second количество секунд для нажатия секретной кнопки
-      if(checkIFF(10)==true) { // если в течении 10 секунд секретная кнопка не нажата, то
+      if(checkIFF(hotTime)==true) { // если в течении hotTime секунд секретная кнопка не нажата, то
         alarmState = 4; // перевод сигнализации в состояние - несанкционированное проникновение
-        sendTextMessage("WARNING! The perimeter broken, unauthorized access."); // немедленно отправляем смс сообщение о несанкционированном проникновении
-        Serial.println("WARNING! The perimeter broken, unauthorized access.");
+        if(motionSensorState==true){ // если периметр разомкнут и сработал датчик движения
+          sendTextMessage("WARNING! The perimeter broken, unauthorized access. motionSensor=True"); // немедленно отправляем смс сообщение о несанкционированном проникновении
+          Serial.println("WARNING! The perimeter broken, unauthorized access. motionSensor=True");
+        } 
+        else { // иначе
+          sendTextMessage("WARNING! The perimeter broken, unauthorized access. motionSensor=False"); // немедленно отправляем смс сообщение о несанкционированном проникновении
+          Serial.println("WARNING! The perimeter broken, unauthorized access. motionSensor=False");
+        }
       } 
       else {
         alarmState = 0; // перевод сигнализации в состояние - снята с охраны
